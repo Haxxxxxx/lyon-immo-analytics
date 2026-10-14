@@ -12,3 +12,15 @@ models:
         description: Median price per m² (€). Headline metric.
       - name: prix_m2_moyen
         description: Mean price per m² (€). Kept to show how outliers skew it.
+
+  - name: fct_prix_m2_annuel
+    description: >
+      Yearly sales count, price per m² and typical size by arrondissement and dwelling type.
+      Separate from the monthly mart because medians can't be re-aggregated.
+    columns:
+      - name: arrondissement
+        data_tests: [not_null]
+      - name: nb_ventes
+        data_tests: [not_null]
+      - name: prix_m2_median
+        description: Median price per m² (€). Headline metric.

@@ -14,7 +14,8 @@ python -m venv .venv && .venv/Scripts/activate   # macOS/Linux: source .venv/bin
 pip install -r requirements.txt
 python load/download_dvf.py                # Rhône DVF 2021–2025 → data/
 python load/load_dvf.py                    # data/*.csv.gz → raw.dvf, untouched
-cd dbt && dbt seed && dbt build            # models + tests
+cd dbt && dbt seed && dbt build && cd ..   # models + tests
+MB_API_KEY=mb_xxx python metabase/create_dashboard.py   # dashboard as code
 ```
 
 ## Modelling decisions
