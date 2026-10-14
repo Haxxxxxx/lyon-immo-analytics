@@ -1,0 +1,19 @@
+version: 2
+
+models:
+  - name: stg_dvf__mutations
+    description: >
+      Raw DVF lines for Lyon's 9 arrondissements, typed. Several rows share one
+      id_mutation (one per lot or parcel), and valeur_fonciere is repeated on each.
+    columns:
+      - name: id_mutation
+        description: Sale identifier. Not unique at this grain.
+        data_tests: [not_null]
+      - name: date_mutation
+        data_tests: [not_null]
+      - name: code_commune
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('arrondissements')
+                field: code_commune

@@ -1,0 +1,11 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    description: Files loaded untouched by load/load_dvf.py (every column is text).
+    tables:
+      - name: dvf
+        description: >
+          DVF géolocalisées (Etalab), Rhône department, one row per property unit or
+          parcel of a sale. https://files.data.gouv.fr/geo-dvf/latest/csv/

@@ -1,0 +1,13 @@
+# Lives in the project folder so the repo runs as-is; dbt picks it up from the working directory.
+lyon_immo:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DBT_HOST', 'localhost') }}"
+      port: 5432
+      user: "{{ env_var('DBT_USER', 'analytics') }}"
+      password: "{{ env_var('DBT_PASSWORD', 'analytics') }}"
+      dbname: lyon_immo
+      schema: public
+      threads: 4

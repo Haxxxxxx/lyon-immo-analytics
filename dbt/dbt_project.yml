@@ -1,0 +1,35 @@
+name: lyon_immo
+version: "1.0.0"
+config-version: 2
+profile: lyon_immo
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+models:
+  lyon_immo:
+    # Views are cheap to keep and always fresh; marts are tables because Metabase queries them
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: view
+      +schema: intermediate
+    marts:
+      +materialized: table
+      +schema: marts
+
+seeds:
+  lyon_immo:
+    +schema: marts
+    arrondissements:
+      +column_types:
+        code_commune: varchar(5)
+
+vars:
+  # Plausible €/m² range for a Lyon dwelling. Outside it (~1% of sales): symbolic prices
+  # (family transfers, viager down payments) or a surface that doesn't match the price.
+  prix_m2_min: 1000
+  prix_m2_max: 20000

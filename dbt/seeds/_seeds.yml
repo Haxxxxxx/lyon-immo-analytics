@@ -1,0 +1,8 @@
+version: 2
+
+seeds:
+  - name: arrondissements
+    description: INSEE codes of Lyon's 9 arrondissements and their display names.
+    columns:
+      - name: code_commune
+        data_tests: [unique, not_null]

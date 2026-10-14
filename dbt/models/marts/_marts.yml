@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: fct_prix_m2_mensuel
+    description: Monthly sales count and price per m² by arrondissement and dwelling type. Read by Metabase.
+    columns:
+      - name: arrondissement
+        data_tests: [not_null]
+      - name: nb_ventes
+        data_tests: [not_null]
+      - name: prix_m2_median
+        description: Median price per m² (€). Headline metric.
+      - name: prix_m2_moyen
+        description: Mean price per m² (€). Kept to show how outliers skew it.

@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: int_dvf__ventes_logement
+    description: >
+      One row per sale ('Vente') that contains exactly one dwelling. Multi-dwelling
+      sales are excluded because their total price can't be split per unit.
+    columns:
+      - name: id_mutation
+        description: Unique here; proves the multi-row sales were collapsed correctly.
+        data_tests: [unique, not_null]
+      - name: type_local
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Appartement', 'Maison']
+      - name: prix_m2
+        data_tests: [not_null]
