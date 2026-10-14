@@ -24,7 +24,53 @@ DVF, Carte des loyers, Encadrement des loyers
   → Metabase: 4 dashboards with filters (created by script)
 ```
 
-![dbt lineage graph](docs/lineage.png)
+<!-- lineage:start -->
+```mermaid
+flowchart LR
+    subgraph sources["Sources (raw)"]
+        n12["raw.carte_loyers"]
+        n13["raw.dvf"]
+        n14["raw.encadrement_loyers"]
+    end
+    subgraph seeds["Seeds"]
+        n10["arrondissements"]
+        n11["segments_loyer"]
+    end
+    subgraph staging["Staging"]
+        n7["stg_anil__loyers"]
+        n8["stg_dvf__mutations"]
+        n9["stg_grandlyon__encadrement"]
+    end
+    subgraph intermediate["Intermediate"]
+        n5["int_dvf__ventes_logement"]
+        n6["int_encadrement__plafonds_zone"]
+    end
+    subgraph marts["Marts"]
+        n0["dim_plafonds_loyer"]
+        n1["fct_louer_vs_acheter"]
+        n2["fct_loyers_arrondissement"]
+        n3["fct_prix_m2_annuel"]
+        n4["fct_prix_m2_mensuel"]
+    end
+    n6 --> n0
+    n10 --> n0
+    n3 --> n1
+    n2 --> n1
+    n10 --> n1
+    n7 --> n2
+    n10 --> n2
+    n11 --> n2
+    n5 --> n3
+    n10 --> n3
+    n5 --> n4
+    n10 --> n4
+    n8 --> n5
+    n9 --> n6
+    n12 --> n7
+    n13 --> n8
+    n14 --> n9
+```
+<!-- lineage:end -->
 
 | Layer | Model | Grain | Materialization |
 |---|---|---|---|
@@ -165,6 +211,7 @@ python load/download_loyers.py             # ANIL rents + rent control → data/
 python load/load_dvf.py                    # → raw.dvf, untouched
 python load/load_loyers.py                 # → raw.carte_loyers, raw.encadrement_loyers
 cd dbt && dbt seed && dbt build && cd ..   # models + tests
+python docs/generate_lineage.py            # refresh the lineage diagram in this README
 MB_API_KEY=mb_xxx python metabase/create_dashboards.py   # dashboards as code
 ```
 

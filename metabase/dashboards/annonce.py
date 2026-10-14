@@ -29,20 +29,20 @@ select
     round(plafond_m2_bas * {{{{surface}}}})                             as loyer_max_bas,
     round(plafond_m2_haut * {{{{surface}}}})                            as loyer_max_haut,
     case
-        when {{{{loyer_hc}}}} <= plafond_m2_bas * {{{{surface}}}} then '✅ Légal dans toutes les zones'
-        when {{{{loyer_hc}}}} > plafond_m2_haut * {{{{surface}}}} then '❌ Au-dessus du plafond partout'
-        else '⚠️ Dépend de la zone et de l''époque de construction'
+        when {{{{loyer_hc}}}} <= plafond_m2_bas * {{{{surface}}}} then '✅ Légal partout'
+        when {{{{loyer_hc}}}} > plafond_m2_haut * {{{{surface}}}} then '❌ Illégal partout'
+        else '⚠️ Selon zone / époque'
     end                                                                 as verdict,
     greatest(0, round({{{{loyer_hc}}}} - plafond_m2_haut * {{{{surface}}}})) as depassement_mensuel_min
 from plafonds
 order by code_commune""",
     columns(
         arrondissement=col("Arrondissement"),
-        loyer_annonce_m2=col("Loyer de l'annonce", " €/m²", decimals=1),
-        loyer_max_bas=col("Loyer max légal (zone la moins chère)", " €"),
-        loyer_max_haut=col("Loyer max légal (zone la plus chère)", " €"),
+        loyer_annonce_m2=col("Mon loyer", " €/m²", decimals=1),
+        loyer_max_bas=col("Max légal (zone − chère)", " €"),
+        loyer_max_haut=col("Max légal (zone + chère)", " €"),
         verdict=col("Verdict"),
-        depassement_mensuel_min=col("Dépassement certain", " €/mois"),
+        depassement_mensuel_min=col("Dépassement certain", " €"),
     ),
 )
 
@@ -78,7 +78,7 @@ MODE_EMPLOI = text("""
 
 Depuis novembre 2021, les loyers de Lyon sont **encadrés** : un loyer **hors charges** ne peut pas dépasser le **loyer de référence majoré** (référence + 20 %), qui dépend de la zone, du nombre de pièces, de l'époque de construction et du meublé.
 
-**Mode d'emploi :** renseigne en haut le **loyer hors charges** (pas charges comprises !), la **surface**, le **nombre de pièces** et **meublé ou non**. Si tu connais l'arrondissement et l'année de construction, ajoute-les : le verdict devient plus précis. Chaque arrondissement contient plusieurs zones ; pour connaître la zone exacte d'une adresse, utilise la carte officielle de la Métropole de Lyon.
+**Mode d'emploi :** renseigne en haut le **loyer hors charges** (pas charges comprises !), la **surface**, le **nombre de pièces** et **meublé ou non**. Si tu connais l'arrondissement et l'année de construction, ajoute-les : le verdict devient plus précis. **⚠️ Selon zone / époque** veut dire que le loyer est légal dans certaines zones de l'arrondissement mais pas dans d'autres : regarde le tableau détaillé. Chaque arrondissement contient plusieurs zones ; pour connaître la zone exacte d'une adresse, utilise la carte officielle de la Métropole de Lyon.
 
 **Si le loyer dépasse le plafond :** le propriétaire ne peut le justifier que par un *complément de loyer* pour des caractéristiques exceptionnelles, qui doit figurer dans le bail. Sinon, le locataire peut demander une mise en conformité. Le bail doit aussi mentionner le loyer de référence.
 
@@ -98,8 +98,8 @@ DASHBOARD = {
                    ["avant 1946", "1946-1970", "1971-1990", "1991-2005", "après 2005"]),
     ],
     "layout": [
-        place(MODE_EMPLOI, 0, 0, 24, 7),
-        place(verdict, 7, 0, 24, 7),
-        place(plafonds_detail, 14, 0, 24, 9),
+        place(MODE_EMPLOI, 0, 0, 24, 8),
+        place(verdict, 8, 0, 24, 8),
+        place(plafonds_detail, 16, 0, 24, 9),
     ],
 }
