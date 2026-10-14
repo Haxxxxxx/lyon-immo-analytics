@@ -3,9 +3,19 @@ version: 2
 sources:
   - name: raw
     schema: raw
-    description: Files loaded untouched by load/load_dvf.py (every column is text).
+    description: Files loaded untouched by load/ (every column is text).
     tables:
       - name: dvf
         description: >
           DVF géolocalisées (Etalab), Rhône department, one row per property unit or
           parcel of a sale. https://files.data.gouv.fr/geo-dvf/latest/csv/
+      - name: carte_loyers
+        description: >
+          ANIL "Carte des loyers": modelled rent per m² from leboncoin and SeLoger listings,
+          charges included, unfurnished, by commune (Lyon by arrondissement). One file per
+          segment (all apartments, 1-2 rooms, 3+ rooms). Editions can't be compared over time.
+          Source: Estimations ANIL, à partir des données du Groupe SeLoger et de leboncoin.
+      - name: encadrement_loyers
+        description: >
+          Métropole de Lyon rent control: reference rents (excluding charges) per IRIS, as a
+          JSON tree rooms -> construction period -> furnished or not. data.grandlyon.com

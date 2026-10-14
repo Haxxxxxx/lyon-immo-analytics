@@ -24,3 +24,33 @@ models:
         data_tests: [not_null]
       - name: prix_m2_median
         description: Median price per m² (€). Headline metric.
+
+  - name: dim_plafonds_loyer
+    description: >
+      Rent control caps by arrondissement, zone, rooms, construction period and furnished.
+      Per m², excluding charges. loyer_max_m2 is the legal maximum.
+    columns:
+      - name: arrondissement
+        data_tests: [not_null]
+      - name: loyer_max_m2
+        description: Legal maximum rent per m², excluding charges (€).
+
+  - name: fct_loyers_arrondissement
+    description: >
+      Market listing rent per m² by arrondissement and segment (latest ANIL edition),
+      charges included, unfurnished, with the 95% prediction interval.
+    columns:
+      - name: arrondissement
+        data_tests: [not_null]
+      - name: loyer_m2_cc
+        description: Predicted rent per m², charges included (€).
+        data_tests: [not_null]
+
+  - name: fct_louer_vs_acheter
+    description: Apartment price-to-rent ratio by arrondissement (DVF median price vs ANIL rent).
+    columns:
+      - name: code_commune
+        data_tests: [unique, not_null]
+      - name: annees_de_loyer
+        description: Purchase price per m² divided by a year of rent per m².
+        data_tests: [not_null]

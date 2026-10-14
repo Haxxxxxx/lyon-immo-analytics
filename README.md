@@ -1,17 +1,27 @@
 # Lyon Immo Analytics
 
-Pipeline ELT sur les transactions immobilières lyonnaises (DVF) : Postgres, dbt, Metabase.
+Pipeline ELT sur l'immobilier lyonnais (ventes DVF, loyers ANIL, encadrement des loyers) :
+Postgres, dbt, Metabase.
 
-Every property sale in Lyon's 9 arrondissements from 2021 to 2025, modelled into a tested
-price-per-m² and volume dataset, and served in a Metabase dashboard.
+Three public sources about Lyon housing, modelled into tested marts and served in four
+Metabase dashboards: the sales market, what a rent budget buys, a listing checker for Lyon's
+rent control, and a buy-vs-rent comparison. I built it while looking for a flat in Lyon.
+
+## Sources
+
+| Source | Publisher | What it gives | Grain |
+|---|---|---|---|
+| [DVF géolocalisées](https://files.data.gouv.fr/geo-dvf/latest/csv/) | DGFiP / Etalab | Every property sale, 2021–2025 | one row per lot or parcel of a sale |
+| [Carte des loyers](https://www.data.gouv.fr/datasets/carte-des-loyers-indicateurs-de-loyers-dannonce-par-commune-en-2025) | ANIL / Ministère du Logement | Modelled listing rent per m², charges included | commune (arrondissement in Lyon) × segment |
+| [Encadrement des loyers](https://www.data.gouv.fr/datasets/encadrement-des-loyers-de-la-metropole-de-lyon-2025-2026) | Métropole de Lyon | Legal reference rents | IRIS (neighbourhood), as a JSON tree |
 
 ## Architecture
 
 ```
-DVF géolocalisées (data.gouv.fr)
-  → Python loader → Postgres raw.dvf (untouched, all text)
-  → dbt: staging → intermediate → marts (16 tests)
-  → Metabase dashboard (created by script)
+DVF, Carte des loyers, Encadrement des loyers
+  → Python loaders → Postgres raw.* (untouched, all text)
+  → dbt: staging → intermediate → marts (35 tests)
+  → Metabase: 4 dashboards with filters (created by script)
 ```
 
 ![dbt lineage graph](docs/lineage.png)
@@ -19,25 +29,39 @@ DVF géolocalisées (data.gouv.fr)
 | Layer | Model | Grain | Materialization |
 |---|---|---|---|
 | staging | `stg_dvf__mutations` | one raw DVF line, Lyon only, typed | view |
+| staging | `stg_anil__loyers` | arrondissement × rent segment | view |
+| staging | `stg_grandlyon__encadrement` | IRIS × rooms × construction period × furnished | view |
 | intermediate | `int_dvf__ventes_logement` | one sale of a single dwelling | view |
+| intermediate | `int_encadrement__plafonds_zone` | arrondissement × rent control zone × rooms × period × furnished | view |
 | marts | `fct_prix_m2_mensuel` | arrondissement × month × dwelling type | table |
 | marts | `fct_prix_m2_annuel` | arrondissement × year × dwelling type | table |
+| marts | `fct_loyers_arrondissement` | arrondissement × rent segment | table |
+| marts | `dim_plafonds_loyer` | arrondissement × zone × rooms × period × furnished | table |
+| marts | `fct_louer_vs_acheter` | arrondissement | table |
 
-## Dashboard
+## Dashboards
 
 ![Metabase dashboard](docs/dashboard.png)
 
-**Key insight:** Lyon's market corrected after interest rates rose. Sales volume fell 29%
-between 2021 and 2024, and the median apartment price dropped about 12% between 2022 and 2025
-(5,088 → 4,471 €/m²). 2025 shows volumes recovering (+16%) without prices following. Lyon 6e
-stays the most expensive arrondissement, about 22% above the city median.
+1. **Marché de la vente**: price per m² and sales volumes. Lyon's market corrected after
+   interest rates rose: sales fell 29% between 2021 and 2024, and the median apartment price
+   dropped about 12% between 2022 and 2025 (5,088 → 4,471 €/m²).
+2. **Louer à Lyon : mon budget**: filters for a solo budget, a flatshare budget and the number
+   of flatmates. With 600 €/month alone you rent 30–33 m² in any arrondissement: small-flat
+   rents barely vary across Lyon (18.4–20.3 €/m²) while sale prices vary by almost 50%. A
+   flatshare of two at 1,400 € gives 42–49 m² each, about 45% more space per person.
+3. **Vérifier une annonce**: enter a listing's rent excluding charges, surface, rooms and
+   furnished or not; it tells you whether the rent is legal under Lyon's rent control, in
+   every zone, depending on the zone, or nowhere, and by how much it is over.
+4. **Louer ou acheter ?**: buying an apartment costs 19 to 26 years of rent depending on the
+   arrondissement. Lyon 6e is the least favourable to buy, 5e and 9e the most.
 
 ## Modelling decisions
 
-### ELT: the loader doesn't clean anything
-`load/load_dvf.py` copies the files into `raw.dvf` as-is, with every column as text. All
+### ELT: the loaders don't clean anything
+`load/load_dvf.py` and `load/load_loyers.py` copy the files into `raw` as-is, with every column as text. All
 typing and business logic lives in dbt, where it's versioned, tested and documented. The
-loader only checks that every yearly file has the same header, and fails on schema drift.
+loaders only check that every file of a table has the same header, and fail on schema drift.
 
 ### One sale is spread over several rows
 DVF stores a sale (`id_mutation`) as one row per lot or parcel, with the **total** price
@@ -80,9 +104,37 @@ letting the BI tool re-aggregate them wrongly.
 Staging and intermediate are views: cheap, and always in sync with the layer below. Marts are
 tables because Metabase queries them on every dashboard load. Metabase only reads `marts`.
 
-### Dashboard as code
-`metabase/create_dashboard.py` creates the charts and the dashboard through Metabase's API.
-It's re-runnable, and the dashboard can be rebuilt from scratch on a new machine.
+### Rents: read the methodology note before charting
+The ANIL rent indicators are modelled from listings, **charges included**, for **unfurnished**
+flats listed in Q3 of the edition year. The ANIL guide states that editions **can't be compared
+over time** (the model's geography changes every year), so the pipeline only loads the latest
+edition and there is no rent trend chart. The guide's reliability bars (adjusted R² ≥ 0.5, at
+least 30 listings) are a dbt test: every Lyon arrondissement clears them with thousands of
+listings. Each indicator is computed for a reference surface (37 m² for 1–2 rooms, 72 m² for
+3+), kept in the `segments_loyer` seed.
+
+### Rent control: flatten a JSON tree, then prove the zones are consistent
+The Métropole publishes reference rents per IRIS as a JSON tree (rooms → construction period →
+furnished → reference, maximum, minimum). Staging flattens it with `jsonb_each`. The caps are
+actually set per **zone**; every IRIS of a zone repeats them. The intermediate model groups by
+zone *and* by the values, so the grain test fails if two IRIS of one zone ever disagree.
+
+### Two different "rents" are never mixed
+Market rents (ANIL) include charges; rent control caps exclude them. The listing checker asks
+for the rent **excluding charges** and only compares it with the caps. The budget dashboard
+only uses market rents.
+
+### Buy vs rent joins the two sources
+`fct_louer_vs_acheter` joins the latest DVF median apartment price with the ANIL rent on the
+arrondissement code: price per m² ÷ (rent per m² × 12) gives the years of rent a purchase is
+worth. The rent includes charges, so the gross yield is slightly flattering; the dashboard
+says so.
+
+### Dashboards as code
+`metabase/create_dashboards.py` builds the four dashboards through Metabase's API, one file per
+dashboard in `metabase/dashboards/`. Filters are declared once per dashboard; the script gives
+each card a template tag for every filter its SQL uses and wires them up. It's re-runnable, so
+the dashboards can be rebuilt from scratch on a new machine.
 
 ## Limitations
 
@@ -94,6 +146,11 @@ It's re-runnable, and the dashboard can be rebuilt from scratch on a new machine
   as one dwelling. This is rare and accepted.
 - Prices are nominal euros, not adjusted for inflation.
 - DVF is a rolling window of about 5 years: re-running the download later shifts the period.
+- Market rents are **model estimates per arrondissement**, not medians of real leases; a real
+  listing can fall outside the 95% interval. They're also unfurnished: furnished flats cost
+  about 13% more (from the rent control reference rents).
+- The listing checker can't place an address in its rent control zone (that needs geocoding),
+  so it shows the range across the arrondissement's zones; the official map gives the exact zone.
 
 ## How to run
 
@@ -104,13 +161,16 @@ docker compose up -d                       # Postgres :5432, Metabase :3000
 python -m venv .venv && .venv/Scripts/activate   # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 python load/download_dvf.py                # Rhône DVF 2021–2025 → data/
-python load/load_dvf.py                    # data/*.csv.gz → raw.dvf, untouched
+python load/download_loyers.py             # ANIL rents + rent control → data/loyers/
+python load/load_dvf.py                    # → raw.dvf, untouched
+python load/load_loyers.py                 # → raw.carte_loyers, raw.encadrement_loyers
 cd dbt && dbt seed && dbt build && cd ..   # models + tests
-MB_API_KEY=mb_xxx python metabase/create_dashboard.py   # dashboard as code
+MB_API_KEY=mb_xxx python metabase/create_dashboards.py   # dashboards as code
 ```
 
 For the last step, connect Metabase to Postgres first (host `postgres`, database `lyon_immo`,
 user and password `analytics`) and create an API key in Admin → Authentication → API keys.
 
-**Data:** [DVF géolocalisées](https://files.data.gouv.fr/geo-dvf/latest/csv/), Etalab /
-DGFiP, Licence Ouverte 2.0.
+**Data:** DVF géolocalisées (Etalab / DGFiP), Licence Ouverte 2.0. Estimations ANIL, à partir
+des données du Groupe SeLoger et de leboncoin. Encadrement des loyers : Métropole de Lyon,
+data.grandlyon.com.

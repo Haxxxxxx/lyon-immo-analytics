@@ -6,3 +6,11 @@ seeds:
     columns:
       - name: code_commune
         data_tests: [unique, not_null]
+
+  - name: segments_loyer
+    description: >
+      ANIL listing segments and the reference surface each rent indicator is computed for
+      (guide d'utilisation, Carte des loyers 2025).
+    columns:
+      - name: segment
+        data_tests: [unique, not_null]

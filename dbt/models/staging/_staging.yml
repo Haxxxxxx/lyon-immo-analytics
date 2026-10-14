@@ -17,3 +17,43 @@ models:
               arguments:
                 to: ref('arrondissements')
                 field: code_commune
+
+  - name: stg_anil__loyers
+    description: >
+      Modelled listing rent per m² by Lyon arrondissement and apartment segment. Charges
+      included, unfurnished, listings of Q3 of the edition year.
+    columns:
+      - name: segment
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['tous', 't1_t2', 't3_plus']
+      - name: loyer_m2_cc
+        description: Predicted rent per m², charges included (€).
+        data_tests: [not_null]
+      - name: code_commune
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('arrondissements')
+                field: code_commune
+
+  - name: stg_grandlyon__encadrement
+    description: >
+      Rent control reference rents (€/m², excluding charges) for each Lyon IRIS. The legal
+      maximum is the "majoré" value (reference + 20%).
+    columns:
+      - name: nb_pieces
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['1', '2', '3', '4 et plus']
+      - name: epoque_construction
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['avant 1946', '1946-1970', '1971-1990', '1991-2005', 'après 2005']
+      - name: loyer_reference_majore_m2
+        description: Legal maximum rent per m², excluding charges (€).
+        data_tests: [not_null]

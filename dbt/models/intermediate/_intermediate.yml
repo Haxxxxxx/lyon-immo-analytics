@@ -16,3 +16,6 @@ models:
                 values: ['Appartement', 'Maison']
       - name: prix_m2
         data_tests: [not_null]
+
+  - name: int_encadrement__plafonds_zone
+    description: Rent control reference rents deduplicated from IRIS to zone level.
