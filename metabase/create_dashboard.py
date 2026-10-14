@@ -15,6 +15,19 @@ COLLECTION = "Lyon Immo Analytics"
 
 LATEST_YEAR = "(select max(annee) from marts.fct_prix_m2_annuel)"
 
+
+def col(title: str, suffix: str = "") -> dict:
+    # French number format: 4 808 rather than 4,808
+    settings = {"column_title": title, "number_separators": ", "}
+    if suffix:
+        settings["suffix"] = suffix
+    return settings
+
+
+def columns(**cols: dict) -> dict:
+    return {"column_settings": {json.dumps(["name", name]): c for name, c in cols.items()}}
+
+
 CARDS = {
     "prix_par_arrondissement": {
         "name": "Prix médian au m² par arrondissement (appartements, dernière année)",
@@ -28,6 +41,41 @@ order by prix_m2_median desc""",
             "graph.dimensions": ["arrondissement"],
             "graph.metrics": ["prix_m2_median"],
             "graph.show_values": True,
+            "graph.x_axis.title_text": "Arrondissement",
+            "graph.y_axis.title_text": "Prix médian (€/m²)",
+            **columns(prix_m2_median=col("Prix médian", " €/m²")),
+        },
+    },
+    "evolution_prix": {
+        "name": "Évolution du prix médian au m² (appartements)",
+        "display": "line",
+        "query": """
+select make_date(annee, 1, 1) as annee, arrondissement, round(prix_m2_median) as prix_m2_median
+from marts.fct_prix_m2_annuel
+where type_local = 'Appartement'
+order by annee, arrondissement""",
+        "viz": {
+            "graph.dimensions": ["annee", "arrondissement"],
+            "graph.metrics": ["prix_m2_median"],
+            "graph.x_axis.title_text": "Année",
+            "graph.y_axis.title_text": "Prix médian (€/m²)",
+            **columns(prix_m2_median=col("Prix médian", " €/m²")),
+        },
+    },
+    "volume_mensuel": {
+        "name": "Volume mensuel de ventes (logements)",
+        "display": "bar",
+        "query": """
+select mois, sum(nb_ventes) as nb_ventes
+from marts.fct_prix_m2_mensuel
+group by mois
+order by mois""",
+        "viz": {
+            "graph.dimensions": ["mois"],
+            "graph.metrics": ["nb_ventes"],
+            "graph.x_axis.title_text": "Mois",
+            "graph.y_axis.title_text": "Nombre de ventes",
+            **columns(nb_ventes=col("Ventes")),
         },
     },
     "comparaison_types": {
@@ -46,33 +94,15 @@ from marts.fct_prix_m2_annuel
 where annee = {LATEST_YEAR}
 group by code_commune, arrondissement
 order by code_commune""",
-        "viz": {},
-    },
-    "evolution_prix": {
-        "name": "Évolution du prix médian au m² (appartements)",
-        "display": "line",
-        "query": """
-select make_date(annee, 1, 1) as annee, arrondissement, round(prix_m2_median) as prix_m2_median
-from marts.fct_prix_m2_annuel
-where type_local = 'Appartement'
-order by annee, arrondissement""",
-        "viz": {
-            "graph.dimensions": ["annee", "arrondissement"],
-            "graph.metrics": ["prix_m2_median"],
-        },
-    },
-    "volume_mensuel": {
-        "name": "Volume mensuel de ventes (logements)",
-        "display": "bar",
-        "query": """
-select mois, sum(nb_ventes) as nb_ventes
-from marts.fct_prix_m2_mensuel
-group by mois
-order by mois""",
-        "viz": {
-            "graph.dimensions": ["mois"],
-            "graph.metrics": ["nb_ventes"],
-        },
+        "viz": columns(
+            arrondissement=col("Arrondissement"),
+            ventes_appartements=col("Ventes appartements"),
+            prix_m2_appartement=col("Prix médian appartement", " €/m²"),
+            surface_appartement=col("Surface médiane appartement", " m²"),
+            ventes_maisons=col("Ventes maisons"),
+            prix_m2_maison=col("Prix médian maison", " €/m²"),
+            surface_maison=col("Surface médiane maison", " m²"),
+        ),
     },
 }
 
@@ -84,12 +114,14 @@ INSIGHT = """## Ce qu'il faut retenir
 
 *Source : DVF géolocalisées 2021–2025 (Etalab). Ventes contenant un seul logement, hors VEFA ; ~1 % de prix aberrants exclus. Médianes, pas moyennes.*"""
 
-# Layout on Metabase's 24-column grid: insight on top, then two rows of two charts
+# Layout on Metabase's 24-column grid as (card, row, col, width, height):
+# insight on top, two charts side by side, then full-width time series and table
+INSIGHT_HEIGHT = 7
 LAYOUT = [
-    ("prix_par_arrondissement", 5, 0),
-    ("comparaison_types", 5, 12),
-    ("evolution_prix", 14, 0),
-    ("volume_mensuel", 14, 12),
+    ("prix_par_arrondissement", 7, 0, 12, 9),
+    ("evolution_prix", 7, 12, 12, 9),
+    ("volume_mensuel", 16, 0, 24, 7),
+    ("comparaison_types", 23, 0, 24, 7),
 ]
 
 
@@ -160,7 +192,7 @@ def main() -> None:
     dashcards = [{
         "id": -1,
         "card_id": None,
-        "row": 0, "col": 0, "size_x": 24, "size_y": 5,
+        "row": 0, "col": 0, "size_x": 24, "size_y": INSIGHT_HEIGHT,
         "visualization_settings": {
             "virtual_card": {
                 "name": None, "display": "text", "archived": False,
@@ -169,11 +201,11 @@ def main() -> None:
             "text": INSIGHT,
         },
     }]
-    for i, (key, row, col) in enumerate(LAYOUT, start=2):
+    for i, (key, row, column, width, height) in enumerate(LAYOUT, start=2):
         dashcards.append({
             "id": -i,
             "card_id": card_ids[key],
-            "row": row, "col": col, "size_x": 12, "size_y": 9,
+            "row": row, "col": column, "size_x": width, "size_y": height,
             "visualization_settings": {},
         })
     api("PUT", f"/dashboard/{dashboard['id']}", {"dashcards": dashcards})
